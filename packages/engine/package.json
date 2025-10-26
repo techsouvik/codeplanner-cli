@@ -1,0 +1,21 @@
+{
+  "name": "@codeplanner/engine",
+  "version": "0.1.0",
+  "description": "CodePlanner engine with AST parsing and LLM integration",
+  "main": "src/worker.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@codeplanner/shared": "workspace:*",
+    "ts-morph": "^21.0.0",
+    "openai": "^4.0.0",
+    "redis": "^4.6.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.0.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}

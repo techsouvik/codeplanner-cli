@@ -1,0 +1,14 @@
+{
+  "name": "@codeplanner/shared",
+  "version": "0.1.0",
+  "description": "Shared types and utilities for CodePlanner CLI",
+  "main": "src/types.ts",
+  "types": "src/types.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

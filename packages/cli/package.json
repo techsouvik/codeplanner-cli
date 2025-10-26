@@ -1,0 +1,22 @@
+{
+  "name": "@codeplanner/cli",
+  "version": "0.1.0",
+  "description": "CLI frontend for CodePlanner",
+  "main": "src/index.ts",
+  "bin": {
+    "codeplanner": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@codeplanner/shared": "workspace:*",
+    "commander": "^11.0.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.0.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@codeplanner/gateway",
+  "version": "0.1.0",
+  "description": "WebSocket gateway for CodePlanner",
+  "main": "src/server.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@codeplanner/shared": "workspace:*",
+    "redis": "^4.6.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.0.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}

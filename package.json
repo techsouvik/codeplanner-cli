@@ -1,0 +1,24 @@
+{
+  "name": "codeplanner-cli",
+  "version": "0.1.0",
+  "description": "AI-powered code planning and error analysis CLI tool",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "dev:cli": "bun --watch packages/cli/src/index.ts",
+    "dev:gateway": "bun --watch packages/gateway/src/server.ts",
+    "dev:worker": "bun --watch packages/engine/src/worker.ts",
+    "build": "bun build:cli && bun build:gateway && bun build:engine",
+    "cli": "bun packages/cli/src/index.ts",
+    "test:flow": "bash test-flow.sh",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "bun": ">=1.0.0"
+  }
+}
