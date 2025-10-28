@@ -1,0 +1,31 @@
+# Dockerfile for CodePlanner Gateway
+FROM oven/bun:1.1.33-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package.json bun.lockb ./
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/gateway/package.json ./packages/gateway/
+
+# Install dependencies
+RUN bun install --frozen-lockfile
+
+# Copy source code
+COPY packages/shared ./packages/shared
+COPY packages/gateway ./packages/gateway
+
+# Build the gateway
+WORKDIR /app/packages/gateway
+RUN bun run build
+
+# Expose port
+EXPOSE 3000
+
+# Add health check
+HEALTHCHECK --interval=10s --timeout=5s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:3000/health || exit 1
+
+# Start the gateway
+CMD ["bun", "run", "src/server.ts"]

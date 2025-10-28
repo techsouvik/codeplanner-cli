@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # Redis service for message queuing and vector storage
   redis:
     image: redis:7-alpine
     ports:
@@ -9,6 +10,70 @@ services:
     volumes:
       - redis_data:/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # WebSocket Gateway service
+  gateway:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.gateway
+    ports:
+      - "3000:3000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - WS_PORT=3000
+    volumes:
+      - ../packages:/app/packages
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # CodePlanner Engine worker service
+  engine:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.engine
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - ../packages:/app/packages
+      - ../examples:/app/examples
+    restart: unless-stopped
+
+  # CLI service for interactive use
+  cli:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.cli
+    depends_on:
+      gateway:
+        condition: service_healthy
+      engine:
+        condition: service_started
+    environment:
+      - WS_ENDPOINT=ws://gateway:3000
+    volumes:
+      - ../packages:/app/packages
+      - ../examples:/app/examples
+      - .:/workspace
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+    command: /bin/bash
 
 volumes:
   redis_data:

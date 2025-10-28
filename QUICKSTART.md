@@ -22,7 +22,7 @@ bun install
 
 ```bash
 # Copy the example environment file
-cp env.example .env
+cp .env.example .env
 
 # Edit .env and add your OpenAI API key
 # OPENAI_API_KEY=sk-your-actual-api-key-here

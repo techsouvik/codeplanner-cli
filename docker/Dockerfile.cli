@@ -1,0 +1,46 @@
+# Dockerfile for CodePlanner CLI
+FROM oven/bun:1.1.33-alpine
+
+# Install curl for health checks
+RUN apk add --no-cache curl
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package.json bun.lockb ./
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/cli/package.json ./packages/cli/
+
+# Install dependencies
+RUN bun install --frozen-lockfile
+
+# Copy source code
+COPY packages/shared ./packages/shared
+COPY packages/cli ./packages/cli
+
+# Build the CLI
+WORKDIR /app/packages/cli
+RUN bun run build
+
+# Set working directory to workspace
+WORKDIR /workspace
+
+# Create a wrapper script for the CLI
+RUN echo '#!/bin/bash\n\
+echo "🚀 CodePlanner CLI Container Ready!"\n\
+echo "📁 Working directory: $(pwd)"\n\
+echo "🔧 Available commands:"\n\
+echo "  - bun packages/cli/src/index.ts index -p ./your-project"\n\
+echo "  - bun packages/cli/src/index.ts plan \"your query\" -p ./your-project"\n\
+echo "  - bun packages/cli/src/index.ts analyze-error -t compiler -p ./your-project"\n\
+echo ""\n\
+echo "💡 Example usage:"\n\
+echo "  bun packages/cli/src/index.ts index -p examples/sample-project"\n\
+echo ""\n\
+exec "$@"' > /usr/local/bin/cli-wrapper.sh && \
+    chmod +x /usr/local/bin/cli-wrapper.sh
+
+# Set the wrapper as entrypoint
+ENTRYPOINT ["/usr/local/bin/cli-wrapper.sh"]
+CMD ["/bin/bash"]

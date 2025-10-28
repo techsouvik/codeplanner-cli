@@ -19,6 +19,7 @@ class CodePlannerGateway {
   private redis: GatewayRedisClient;
   private server: any;
   private connections: Map<string, ServerWebSocket<WSData>> = new Map();
+  private connectionCount: number = 0;
 
   constructor() {
     this.redis = new GatewayRedisClient();
@@ -52,6 +53,7 @@ class CodePlannerGateway {
             
             // Track the connection
             this.connections.set(connectionId, ws);
+            this.connectionCount++;
             
             console.log(`🔗 Client connected: ${connectionId} (User: ${userId})`);
           },
@@ -92,11 +94,27 @@ class CodePlannerGateway {
           close: (ws) => {
             console.log(`🔌 Client disconnected: ${ws.data.connectionId}`);
             this.connections.delete(ws.data.connectionId);
+            this.connectionCount--;
           }
         },
 
-        // HTTP fetch handler for WebSocket upgrades
-        fetch(req, server) {
+        // HTTP fetch handler for WebSocket upgrades and health checks
+        fetch: (req, server) => {
+          const url = new URL(req.url);
+          
+          // Health check endpoint
+          if (url.pathname === '/health') {
+            return new Response(JSON.stringify({
+              status: 'healthy',
+              service: 'codeplanner-gateway',
+              timestamp: new Date().toISOString(),
+              uptime: process.uptime()
+            }), {
+              headers: { 'Content-Type': 'application/json' }
+            });
+          }
+          
+          // WebSocket upgrade
           const upgraded = server.upgrade(req, {
             data: {
               userId: 'user1',

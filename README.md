@@ -47,50 +47,69 @@ CodePlanner CLI is built with a modular architecture:
 
 ## 🚀 Quick Start
 
-### Prerequisites
+### Option 1: Docker (Recommended)
 
+**Prerequisites:**
+- Docker and Docker Compose
+- OpenAI API Key
+
+**Setup:**
+```bash
+# Clone the repository
+git clone <repository-url>
+cd codeplanner-cli
+
+# Setup environment
+cp docker/docker.env .env
+# Edit .env and add your OpenAI API key
+
+# Start all services
+./docker/start-codeplanner.sh
+
+# Use the CLI
+docker-compose -f docker/docker-compose.yml exec cli bash
+```
+
+**Quick Commands:**
+```bash
+# Index codebase
+docker-compose -f docker/docker-compose.yml exec cli \
+  bun packages/cli/src/index.ts index -p examples/sample-project
+
+# Generate plan
+docker-compose -f docker/docker-compose.yml exec cli \
+  bun packages/cli/src/index.ts plan "Add user authentication" -p examples/sample-project
+```
+
+📖 **See [DOCKER.md](DOCKER.md) for complete Docker setup guide**
+
+### Option 2: Local Development
+
+**Prerequisites:**
 - [Bun](https://bun.sh/) >= 1.0
 - [Docker](https://docs.docker.com/get-docker/)
 - [OpenAI API Key](https://platform.openai.com/api-keys)
 
-### Installation
+**Setup:**
+```bash
+# Clone and install dependencies
+git clone <repository-url>
+cd codeplanner-cli
+bun install
 
-1. **Clone and install dependencies:**
-   ```bash
-   git clone <repository-url>
-   cd codeplanner-cli
-   bun install
-   ```
+# Configure environment
+cp .env.example .env
+# Edit .env and add your OpenAI API key
 
-2. **Configure environment:**
-   ```bash
-   cp env.example .env
-   # Edit .env and add your OpenAI API key
-   ```
+# Start services
+bun run docker:up
+bun run dev:gateway  # Terminal 1
+bun run dev:worker   # Terminal 2
 
-3. **Start services:**
-   ```bash
-   # Start Redis
-   bun run docker:up
-   
-   # Start gateway (Terminal 1)
-   bun run dev:gateway
-   
-   # Start worker (Terminal 2)
-   bun run dev:worker
-   ```
-
-4. **Use the CLI:**
-   ```bash
-   # Index your codebase
-   bun run cli index -p ./your-project
-   
-   # Generate a plan
-   bun run cli plan "Add user authentication" -p ./your-project
-   
-   # Analyze an error
-   bun run cli analyze-error -t compiler -p ./your-project
-   ```
+# Use the CLI
+bun run cli index -p ./your-project
+bun run cli plan "Add user authentication" -p ./your-project
+```
 
 ## 📖 Usage
 

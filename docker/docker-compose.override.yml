@@ -1,0 +1,39 @@
+# Docker Compose Override for Development
+# This file provides development-specific configurations
+
+version: '3.8'
+
+services:
+  # Override CLI service for development
+  cli:
+    environment:
+      - WS_ENDPOINT=ws://gateway:3000
+      - NODE_ENV=development
+    volumes:
+      # Mount source code for live development
+      - ../packages:/app/packages
+      - ../examples:/app/examples
+      - .:/workspace
+      # Mount node_modules to avoid conflicts
+      - /app/packages/cli/node_modules
+      - /app/packages/gateway/node_modules
+      - /app/packages/engine/node_modules
+      - /app/packages/shared/node_modules
+
+  # Override gateway for development
+  gateway:
+    environment:
+      - NODE_ENV=development
+      - REDIS_URL=redis://redis:6379
+      - WS_PORT=3000
+    volumes:
+      - ../packages:/app/packages
+
+  # Override engine for development
+  engine:
+    environment:
+      - NODE_ENV=development
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - ../packages:/app/packages
+      - ../examples:/app/examples
