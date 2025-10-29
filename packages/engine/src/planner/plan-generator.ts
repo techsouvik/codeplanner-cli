@@ -26,8 +26,10 @@ export class PlanGenerator {
       ...config
     };
     
-    this.openai = new OpenAI({ 
-      apiKey: config.apiKey 
+    this.openai = new OpenAI({
+      apiKey: config.apiKey,
+      // Allow overriding the base URL for providers like OpenRouter
+      baseURL: config.baseUrl
     });
   }
 

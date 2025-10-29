@@ -166,9 +166,17 @@ bun run cli analyze-error -t linter -p ./your-project
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `OPENAI_API_KEY` | Your OpenAI API key | Required |
+| `OPENAI_API_KEY` | Your OpenAI API key | Optional (or use `OPENROUTER_API_KEY`) |
+| `OPENROUTER_API_KEY` | Your OpenRouter API key | Optional (or use `OPENAI_API_KEY`) |
 | `REDIS_URL` | Redis connection URL | `redis://localhost:6379` |
 | `WS_PORT` | WebSocket gateway port | `3000` |
+| `LLM_BASE_URL` | Override base URL for LLM provider (e.g., `https://openrouter.ai/api/v1`) | unset |
+| `EMBEDDING_MODEL` | Embedding model id | `text-embedding-3-small` |
+| `PLANNING_MODEL` | Planning model id | `gpt-4-turbo-preview` |
+| `DEBUG_MODEL` | Debugger model id | `PLANNING_MODEL` |
+| `BATCH_SIZE` | Embedding batch size | `20` |
+| `MAX_CONTEXT_CHUNKS` | Max relevant context chunks | `15` |
+| `TEMPERATURE` | Sampling temperature | `0.3` |
 | `EMBEDDING_MODEL` | OpenAI embedding model | `text-embedding-3-small` |
 | `PLANNING_MODEL` | OpenAI planning model | `gpt-4-turbo-preview` |
 

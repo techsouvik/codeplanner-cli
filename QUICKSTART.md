@@ -24,8 +24,13 @@ bun install
 # Copy the example environment file
 cp .env.example .env
 
-# Edit .env and add your OpenAI API key
+# Edit .env and add your API key (OpenAI or OpenRouter)
 # OPENAI_API_KEY=sk-your-actual-api-key-here
+# or
+# OPENROUTER_API_KEY=sk-or-your-api-key-here
+
+# Optional: point to OpenRouter base URL
+# LLM_BASE_URL=https://openrouter.ai/api/v1
 ```
 
 ### 3. Start Redis

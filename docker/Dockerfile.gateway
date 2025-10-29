@@ -1,6 +1,9 @@
 # Dockerfile for CodePlanner Gateway
 FROM oven/bun:1.1.33-alpine
 
+# Install curl for health checks
+RUN apk add --no-cache curl
+
 # Set working directory
 WORKDIR /app
 

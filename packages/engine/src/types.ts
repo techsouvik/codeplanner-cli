@@ -29,6 +29,8 @@ export interface EmbeddingConfig {
   apiKey: string;
   /** Embedding model to use */
   model?: string;
+  /** Base URL to override API endpoint (e.g., OpenRouter) */
+  baseUrl?: string;
   /** Batch size for embedding generation */
   batchSize?: number;
 }
@@ -53,6 +55,8 @@ export interface PlanGeneratorConfig {
   apiKey: string;
   /** Model to use for plan generation */
   model?: string;
+  /** Base URL to override API endpoint (e.g., OpenRouter) */
+  baseUrl?: string;
   /** Temperature for plan generation */
   temperature?: number;
   /** Maximum number of relevant code chunks to include */

@@ -40,24 +40,34 @@ class CodePlannerWorker {
       redisUrl: process.env.REDIS_URL || 'redis://localhost:6379'
     });
     
-    // Initialize embedding generator
-    const openaiApiKey = process.env.OPENAI_API_KEY;
-    if (!openaiApiKey) {
-      throw new Error('OPENAI_API_KEY environment variable is required');
+    // Resolve API credentials and endpoints (OpenAI or OpenRouter)
+    const apiKey = process.env.OPENAI_API_KEY || process.env.OPENROUTER_API_KEY;
+    if (!apiKey) {
+      throw new Error('Missing API key. Set OPENAI_API_KEY or OPENROUTER_API_KEY');
     }
-    
+
+    const baseUrl = process.env.LLM_BASE_URL || process.env.OPENAI_BASE_URL || undefined;
+    const embeddingModel = process.env.EMBEDDING_MODEL || 'text-embedding-3-small';
+    const planningModel = process.env.PLANNING_MODEL || 'gpt-4-turbo-preview';
+    const temperature = process.env.TEMPERATURE ? Number(process.env.TEMPERATURE) : 0.3;
+    const batchSize = process.env.BATCH_SIZE ? Number(process.env.BATCH_SIZE) : 20;
+    const maxContextChunks = process.env.MAX_CONTEXT_CHUNKS ? Number(process.env.MAX_CONTEXT_CHUNKS) : 15;
+
+    // Initialize embedding generator
     this.embeddingGen = new EmbeddingGenerator({
-      apiKey: openaiApiKey,
-      model: 'text-embedding-3-small',
-      batchSize: 20
+      apiKey,
+      baseUrl,
+      model: embeddingModel,
+      batchSize
     });
     
     // Initialize plan generator
     this.planGen = new PlanGenerator({
-      apiKey: openaiApiKey,
-      model: 'gpt-4-turbo-preview',
-      temperature: 0.3,
-      maxContextChunks: 15
+      apiKey,
+      baseUrl,
+      model: planningModel,
+      temperature,
+      maxContextChunks
     });
     
     // Initialize error parser and chunker
@@ -305,9 +315,10 @@ class CodePlannerWorker {
       });
       
       const errorDebugger = new Debugger({
-        apiKey: process.env.OPENAI_API_KEY!,
-        model: 'gpt-4-turbo-preview',
-        temperature: 0.2
+        apiKey: process.env.OPENAI_API_KEY || process.env.OPENROUTER_API_KEY!,
+        baseUrl: process.env.LLM_BASE_URL || process.env.OPENAI_BASE_URL || undefined,
+        model: process.env.DEBUG_MODEL || process.env.PLANNING_MODEL || 'gpt-4-turbo-preview',
+        temperature: process.env.TEMPERATURE ? Number(process.env.TEMPERATURE) : 0.2
       }, parser);
       
       // Generate debugging plan using streaming

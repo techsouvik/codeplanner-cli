@@ -49,6 +49,14 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - LLM_BASE_URL=${LLM_BASE_URL}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL}
+      - PLANNING_MODEL=${PLANNING_MODEL}
+      - DEBUG_MODEL=${DEBUG_MODEL}
+      - TEMPERATURE=${TEMPERATURE}
+      - BATCH_SIZE=${BATCH_SIZE}
+      - MAX_CONTEXT_CHUNKS=${MAX_CONTEXT_CHUNKS}
     volumes:
       - ../packages:/app/packages
       - ../examples:/app/examples
