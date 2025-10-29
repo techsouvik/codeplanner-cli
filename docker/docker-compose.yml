@@ -47,13 +47,30 @@ services:
       redis:
         condition: service_healthy
     environment:
+      # Core
       - REDIS_URL=redis://redis:6379
+
+      # Embeddings provider (keys/URL/model only for embeddings)
+      - EMBEDDING_API_KEY=${EMBEDDING_API_KEY}
+      - EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL}
+
+      # Planning provider (keys/URL/model only for planning)
+      - PLANNING_API_KEY=${PLANNING_API_KEY}
+      - PLANNING_BASE_URL=${PLANNING_BASE_URL}
+      - PLANNING_MODEL=${PLANNING_MODEL}
+
+      # Debugging provider (optional; falls back to planning if empty)
+      - DEBUG_API_KEY=${DEBUG_API_KEY}
+      - DEBUG_BASE_URL=${DEBUG_BASE_URL}
+      - DEBUG_MODEL=${DEBUG_MODEL}
+
+      # Optional global fallbacks (used only if task-specific values are empty)
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - LLM_BASE_URL=${LLM_BASE_URL}
-      - EMBEDDING_MODEL=${EMBEDDING_MODEL}
-      - PLANNING_MODEL=${PLANNING_MODEL}
-      - DEBUG_MODEL=${DEBUG_MODEL}
+
+      # Engine tuning
       - TEMPERATURE=${TEMPERATURE}
       - BATCH_SIZE=${BATCH_SIZE}
       - MAX_CONTEXT_CHUNKS=${MAX_CONTEXT_CHUNKS}

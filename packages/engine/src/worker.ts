@@ -40,34 +40,55 @@ class CodePlannerWorker {
       redisUrl: process.env.REDIS_URL || 'redis://localhost:6379'
     });
     
-    // Resolve API credentials and endpoints (OpenAI or OpenRouter)
-    const apiKey = process.env.OPENAI_API_KEY || process.env.OPENROUTER_API_KEY;
-    if (!apiKey) {
-      throw new Error('Missing API key. Set OPENAI_API_KEY or OPENROUTER_API_KEY');
+    // Resolve API credentials and endpoints (separate providers supported)
+    // Embeddings provider
+    const EMB_API_KEY =
+      process.env.EMBEDDING_API_KEY ||
+      process.env.OPENAI_API_KEY ||
+      process.env.OPENROUTER_API_KEY;
+    if (!EMB_API_KEY) {
+      throw new Error('Missing embedding API key. Set EMBEDDING_API_KEY or OPENAI_API_KEY or OPENROUTER_API_KEY');
     }
+    const EMB_BASE_URL =
+      process.env.EMBEDDING_BASE_URL ||
+      process.env.LLM_BASE_URL ||
+      process.env.OPENAI_BASE_URL ||
+      undefined;
+    const EMB_MODEL = process.env.EMBEDDING_MODEL || 'text-embedding-3-small';
+    const BATCH_SIZE = process.env.BATCH_SIZE ? Number(process.env.BATCH_SIZE) : 20;
 
-    const baseUrl = process.env.LLM_BASE_URL || process.env.OPENAI_BASE_URL || undefined;
-    const embeddingModel = process.env.EMBEDDING_MODEL || 'text-embedding-3-small';
-    const planningModel = process.env.PLANNING_MODEL || 'gpt-4-turbo-preview';
-    const temperature = process.env.TEMPERATURE ? Number(process.env.TEMPERATURE) : 0.3;
-    const batchSize = process.env.BATCH_SIZE ? Number(process.env.BATCH_SIZE) : 20;
-    const maxContextChunks = process.env.MAX_CONTEXT_CHUNKS ? Number(process.env.MAX_CONTEXT_CHUNKS) : 15;
+    // Planning provider
+    const PLAN_API_KEY =
+      process.env.PLANNING_API_KEY ||
+      process.env.OPENAI_API_KEY ||
+      process.env.OPENROUTER_API_KEY;
+    if (!PLAN_API_KEY) {
+      throw new Error('Missing planning API key. Set PLANNING_API_KEY or OPENAI_API_KEY or OPENROUTER_API_KEY');
+    }
+    const PLAN_BASE_URL =
+      process.env.PLANNING_BASE_URL ||
+      process.env.LLM_BASE_URL ||
+      process.env.OPENAI_BASE_URL ||
+      undefined;
+    const PLAN_MODEL = process.env.PLANNING_MODEL || 'gpt-4-turbo-preview';
+    const TEMPERATURE = process.env.TEMPERATURE ? Number(process.env.TEMPERATURE) : 0.3;
+    const MAX_CONTEXT_CHUNKS = process.env.MAX_CONTEXT_CHUNKS ? Number(process.env.MAX_CONTEXT_CHUNKS) : 15;
 
     // Initialize embedding generator
     this.embeddingGen = new EmbeddingGenerator({
-      apiKey,
-      baseUrl,
-      model: embeddingModel,
-      batchSize
+      apiKey: EMB_API_KEY,
+      baseUrl: EMB_BASE_URL,
+      model: EMB_MODEL,
+      batchSize: BATCH_SIZE
     });
     
     // Initialize plan generator
     this.planGen = new PlanGenerator({
-      apiKey,
-      baseUrl,
-      model: planningModel,
-      temperature,
-      maxContextChunks
+      apiKey: PLAN_API_KEY,
+      baseUrl: PLAN_BASE_URL,
+      model: PLAN_MODEL,
+      temperature: TEMPERATURE,
+      maxContextChunks: MAX_CONTEXT_CHUNKS
     });
     
     // Initialize error parser and chunker
@@ -315,9 +336,21 @@ class CodePlannerWorker {
       });
       
       const errorDebugger = new Debugger({
-        apiKey: process.env.OPENAI_API_KEY || process.env.OPENROUTER_API_KEY!,
-        baseUrl: process.env.LLM_BASE_URL || process.env.OPENAI_BASE_URL || undefined,
-        model: process.env.DEBUG_MODEL || process.env.PLANNING_MODEL || 'gpt-4-turbo-preview',
+        apiKey:
+          process.env.DEBUG_API_KEY ||
+          process.env.PLANNING_API_KEY ||
+          process.env.OPENAI_API_KEY ||
+          process.env.OPENROUTER_API_KEY!,
+        baseUrl:
+          process.env.DEBUG_BASE_URL ||
+          process.env.PLANNING_BASE_URL ||
+          process.env.LLM_BASE_URL ||
+          process.env.OPENAI_BASE_URL ||
+          undefined,
+        model:
+          process.env.DEBUG_MODEL ||
+          process.env.PLANNING_MODEL ||
+          'gpt-4-turbo-preview',
         temperature: process.env.TEMPERATURE ? Number(process.env.TEMPERATURE) : 0.2
       }, parser);
       

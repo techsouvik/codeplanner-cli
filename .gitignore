@@ -36,3 +36,5 @@ temp/
 PLAN-2day-sprint.md
 README-codeplanner.md
 .codeplannerrc.example
+
+docker/docker.env
