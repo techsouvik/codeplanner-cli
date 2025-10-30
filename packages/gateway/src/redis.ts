@@ -17,7 +17,7 @@ export class GatewayRedisClient {
   private subscriber: RedisClientType;
   private isConnected: boolean = false;
 
-  constructor(redisUrl: string = 'redis://localhost:6379') {
+  constructor(redisUrl: string = 'redis://redis:6379') {
     // Main Redis client for publishing jobs
     this.redis = createClient({ url: redisUrl });
     

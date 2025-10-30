@@ -94,7 +94,7 @@ services:
     volumes:
       - ../packages:/app/packages
       - ../examples:/app/examples
-      - .:/workspace
+      - ../:/workspace
     working_dir: /workspace
     stdin_open: true
     tty: true
