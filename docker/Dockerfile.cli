@@ -27,7 +27,7 @@ RUN bun run build
 WORKDIR /workspace
 
 # Create a wrapper script for the CLI
-RUN echo '#!/bin/bash\n\
+RUN echo '#!/bin/sh\n\
 echo "🚀 CodePlanner CLI Container Ready!"\n\
 echo "📁 Working directory: $(pwd)"\n\
 echo "🔧 Available commands:"\n\

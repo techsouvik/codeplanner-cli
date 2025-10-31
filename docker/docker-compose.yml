@@ -98,7 +98,7 @@ services:
     working_dir: /workspace
     stdin_open: true
     tty: true
-    command: /bin/bash
+    entrypoint: ["/bin/sh"]
 
 volumes:
   redis_data:

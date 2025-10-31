@@ -8,6 +8,7 @@
 
 import OpenAI from 'openai';
 import type { EmbeddingConfig } from '../types';
+import { getRateLimiter } from '../utils/rate-limiter';
 
 /**
  * Embeddings generator using OpenAI's embedding models
@@ -41,9 +42,14 @@ export class EmbeddingGenerator {
       // Truncate text if it's too long (OpenAI has limits)
       const truncatedText = this.truncateText(text);
       
-      const response = await this.openai.embeddings.create({
-        model: this.config.model!,
-        input: truncatedText
+      const response = await this.withRateLimitRetry(async () => {
+        const limiter = getRateLimiter({ name: 'embeddings' });
+        return await limiter.schedule(async () => {
+          return await this.openai.embeddings.create({
+            model: this.config.model!,
+            input: truncatedText
+          });
+        }, 'embeddings.create(single)');
       });
       
       return response.data[0].embedding;
@@ -71,9 +77,14 @@ export class EmbeddingGenerator {
         
         console.log(`📊 Generating embeddings for batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(texts.length / batchSize)}`);
         
-        const response = await this.openai.embeddings.create({
-          model: this.config.model!,
-          input: truncatedBatch
+        const response = await this.withRateLimitRetry(async () => {
+          const limiter = getRateLimiter({ name: 'embeddings' });
+          return await limiter.schedule(async () => {
+            return await this.openai.embeddings.create({
+              model: this.config.model!,
+              input: truncatedBatch
+            });
+          }, 'embeddings.create(batch)');
         });
         
         const batchEmbeddings = response.data.map(d => d.embedding);
@@ -214,5 +225,44 @@ export class EmbeddingGenerator {
    */
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Generic retry with exponential backoff and jitter for rate limiting (429)
+   */
+  private async withRateLimitRetry<T>(fn: () => Promise<T>, options?: {
+    retries?: number;
+    baseDelayMs?: number;
+    maxDelayMs?: number;
+  }): Promise<T> {
+    const retries = options?.retries ?? 5;
+    const baseDelayMs = options?.baseDelayMs ?? 500;
+    const maxDelayMs = options?.maxDelayMs ?? 8000;
+
+    let attempt = 0;
+    let lastErr: any;
+
+    while (attempt <= retries) {
+      try {
+        return await fn();
+      } catch (err: any) {
+        lastErr = err;
+        const status = err?.status || err?.code;
+        const isRateLimit = status === 429 || /429/.test(String(err?.message ?? ''));
+        if (!isRateLimit || attempt === retries) {
+          throw err;
+        }
+
+        const retryAfterHeader = err?.headers?.get?.('retry-after') || err?.response?.headers?.get?.('retry-after');
+        let delay = retryAfterHeader ? Number(retryAfterHeader) * 1000 : Math.min(maxDelayMs, baseDelayMs * Math.pow(2, attempt));
+        delay = Math.min(maxDelayMs, delay + Math.floor(Math.random() * 250));
+        const label = retryAfterHeader ? `Retry-After ${retryAfterHeader}s` : `${delay}ms`;
+        console.warn(`⏳ Rate limited (429). Retrying in ${label}... (attempt ${attempt + 1}/${retries})`);
+        await this.delay(delay);
+        attempt++;
+      }
+    }
+
+    throw lastErr;
   }
 }

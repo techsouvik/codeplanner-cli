@@ -7,6 +7,7 @@
  */
 
 import { Project, SourceFile, FunctionDeclaration, ClassDeclaration, InterfaceDeclaration } from 'ts-morph';
+import * as ts from 'typescript';
 import type { CodeChunk } from '@codeplanner/shared';
 import type { ASTParserConfig } from '../types';
 
@@ -21,14 +22,35 @@ export class ASTParser {
   constructor(config: ASTParserConfig) {
     this.config = config;
     
-    // Initialize the TypeScript project
-    this.project = new Project({
-      tsConfigFilePath: config.tsConfigPath || `${config.projectPath}/tsconfig.json`,
-      skipAddingFilesFromTsConfig: false
-    });
+    // Initialize the TypeScript project with fallback compiler options if no tsconfig.json
+    try {
+      this.project = new Project({
+        tsConfigFilePath: config.tsConfigPath || `${config.projectPath}/tsconfig.json`,
+        skipAddingFilesFromTsConfig: false
+      });
+    } catch (error) {
+      console.warn('⚠️  No tsconfig.json found, using default compiler options');
+      this.project = new Project({
+        compilerOptions: {
+          allowJs: true,
+          target: 99, // ts.ScriptTarget.ES2020
+          module: 1, // ts.ModuleKind.CommonJS
+          moduleResolution: 2, // ts.ModuleResolutionKind.NodeJs
+          strict: true,
+          skipLibCheck: true
+        }
+      });
+    }
     
     // Add source files from the project path
-    this.project.addSourceFilesAtPaths([`${config.projectPath}/**/*.{ts,tsx,js,jsx}`]);
+    const projectPath = config.projectPath.startsWith('./') ? config.projectPath.slice(2) : config.projectPath;
+    console.log(`🔍 Looking for source files in: ${projectPath}`);
+    this.project.addSourceFilesAtPaths([
+      `${projectPath}/**/*.ts`,
+      `${projectPath}/**/*.tsx`,
+      `${projectPath}/**/*.js`,
+      `${projectPath}/**/*.jsx`
+    ]);
   }
 
   /**

@@ -9,6 +9,7 @@
 import OpenAI from 'openai';
 import type { PlanResponse, CodeChunk } from '@codeplanner/shared';
 import type { PlanGeneratorConfig } from '../types';
+import { getRateLimiter } from '../utils/rate-limiter';
 
 /**
  * LLM-powered plan generator using OpenAI GPT models
@@ -56,30 +57,53 @@ export class PlanGenerator {
       console.log(`🧠 Generating plan for query: "${query}"`);
       console.log(`📊 Using ${limitedCode.length} relevant code chunks as context`);
       
-      // Create the streaming completion
-      const stream = await this.openai.chat.completions.create({
-        model: this.config.model!,
-        messages: [
-          {
-            role: 'system',
-            content: this.getSystemPrompt()
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        stream: true,
-        temperature: this.config.temperature,
-        max_tokens: 4000
+      // Create the streaming completion with retry/backoff
+      const limiter = getRateLimiter({ name: 'planning' });
+      const stream = await this.withRateLimitRetry(async () => {
+        return await limiter.schedule(async () => {
+          return await this.openai.chat.completions.create({
+            model: this.config.model!,
+            messages: [
+              {
+                role: 'system',
+                content: this.getSystemPrompt()
+              },
+              {
+                role: 'user',
+                content: prompt
+              }
+            ],
+            stream: true,
+            ...(this.getTokenParam(4000) as any)
+          });
+        }, 'chat.completions(stream)');
       });
 
       // Return the streaming response
       return this.streamResponse(stream);
       
     } catch (error) {
+      const anyErr = error as any;
+      const errMsg =
+        anyErr && typeof anyErr === 'object'
+          ? anyErr.message || anyErr.toString()
+          : String(error);
+      if (
+        (anyErr && anyErr.code === '429') ||
+        (anyErr && anyErr.status === 429) ||
+        /429/.test(errMsg)
+      ) {
+        const help =
+          `\n\n❌ You have hit the OpenAI (or provider) rate limit (429 Too Many Requests).\n` +
+          `- Wait a few minutes and try again.\n` +
+          `- Check your usage/quota at https://platform.openai.com/account/usage .\n` +
+          `- Consider using a different API key or provider.\n` +
+          `- Reduce request frequency if automating.\n`;
+        console.error(help);
+        throw new Error(help);
+      }
       console.error('❌ Failed to generate plan:', error);
-      throw new Error(`Plan generation failed: ${error}`);
+      throw new Error(`Plan generation failed: ${errMsg}`);
     }
   }
 
@@ -210,20 +234,24 @@ Generate plans that are comprehensive yet practical, with clear steps that can b
    */
   async generatePlanSummary(planContent: string): Promise<string> {
     try {
-      const response = await this.openai.chat.completions.create({
-        model: this.config.model!,
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a technical writer. Generate a concise summary of implementation plans.'
-          },
-          {
-            role: 'user',
-            content: `Please provide a 2-3 sentence summary of this implementation plan:\n\n${planContent}`
-          }
-        ],
-        temperature: 0.2,
-        max_tokens: 200
+      const response = await this.withRateLimitRetry(async () => {
+        const limiter = getRateLimiter({ name: 'planning' });
+        return await limiter.schedule(async () => {
+          return await this.openai.chat.completions.create({
+            model: this.config.model!,
+            messages: [
+              {
+                role: 'system',
+                content: 'You are a technical writer. Generate a concise summary of implementation plans.'
+              },
+              {
+                role: 'user',
+                content: `Please provide a 2-3 sentence summary of this implementation plan:\n\n${planContent}`
+              }
+            ],
+            ...(this.getTokenParam(200) as any)
+          });
+        }, 'chat.completions(summary)');
       });
 
       return response.choices[0]?.message?.content || 'Summary generation failed';
@@ -244,12 +272,15 @@ Generate plans that are comprehensive yet practical, with clear steps that can b
     suggestions: string[];
   }> {
     try {
-      const response = await this.openai.chat.completions.create({
-        model: this.config.model!,
-        messages: [
-          {
-            role: 'system',
-            content: `You are a code review expert. Evaluate implementation plans for completeness and quality.
+      const response = await this.withRateLimitRetry(async () => {
+        const limiter = getRateLimiter({ name: 'planning' });
+        return await limiter.schedule(async () => {
+          return await this.openai.chat.completions.create({
+            model: this.config.model!,
+            messages: [
+              {
+                role: 'system',
+                content: `You are a code review expert. Evaluate implementation plans for completeness and quality.
             
             Rate plans on:
             - Clarity and specificity of steps
@@ -260,14 +291,15 @@ Generate plans that are comprehensive yet practical, with clear steps that can b
             - Code examples quality
             
             Provide a score from 1-10 and specific suggestions for improvement.`
-          },
-          {
-            role: 'user',
-            content: `Please evaluate this implementation plan:\n\n${planContent}`
-          }
-        ],
-        temperature: 0.2,
-        max_tokens: 500
+              },
+              {
+                role: 'user',
+                content: `Please evaluate this implementation plan:\n\n${planContent}`
+              }
+            ],
+            ...(this.getTokenParam(500) as any)
+          });
+        }, 'chat.completions(validate)');
       });
 
       const evaluation = response.choices[0]?.message?.content || '';
@@ -305,5 +337,50 @@ Generate plans that are comprehensive yet practical, with clear steps that can b
       temperature: this.config.temperature!,
       maxContextChunks: this.config.maxContextChunks!
     };
+  }
+
+  /**
+   * Generic retry with exponential backoff and jitter for rate limiting (429)
+   */
+  private async withRateLimitRetry<T>(fn: () => Promise<T>, options?: {
+    retries?: number;
+    baseDelayMs?: number;
+    maxDelayMs?: number;
+  }): Promise<T> {
+    const retries = options?.retries ?? 5;
+    const baseDelayMs = options?.baseDelayMs ?? 500;
+    const maxDelayMs = options?.maxDelayMs ?? 8000;
+
+    let attempt = 0;
+    let lastErr: any;
+
+    while (attempt <= retries) {
+      try {
+        return await fn();
+      } catch (err: any) {
+        lastErr = err;
+        const status = err?.status || err?.code;
+        const isRateLimit = status === 429 || /429/.test(String(err?.message ?? ''));
+        if (!isRateLimit || attempt === retries) {
+          throw err;
+        }
+
+        // Honor Retry-After if present
+        const retryAfterHeader = err?.headers?.get?.('retry-after') || err?.response?.headers?.get?.('retry-after');
+        let delay = retryAfterHeader ? Number(retryAfterHeader) * 1000 : Math.min(maxDelayMs, baseDelayMs * Math.pow(2, attempt));
+        // Add jitter
+        delay = Math.min(maxDelayMs, delay + Math.floor(Math.random() * 250));
+        const label = retryAfterHeader ? `Retry-After ${retryAfterHeader}s` : `${delay}ms`;
+        console.warn(`⏳ Rate limited (429). Retrying in ${label}... (attempt ${attempt + 1}/${retries})`);
+        await new Promise(res => setTimeout(res, delay));
+        attempt++;
+      }
+    }
+
+    throw lastErr;
+  }
+
+  private getTokenParam(value: number): any {
+    return { max_completion_tokens: value };
   }
 }

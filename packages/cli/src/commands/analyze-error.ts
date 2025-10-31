@@ -62,15 +62,15 @@ export async function analyzeErrorCommand(options: any) {
     // Set up event handlers for streaming responses
     client.on('stream', (msg: any) => {
       // Stream the debugging plan content as it's generated
-      process.stdout.write(msg.data.chunk);
+      process.stdout.write(
+        typeof msg.data.chunk === 'string' ? msg.data.chunk : JSON.stringify(msg.data.chunk)
+      );
     });
 
     client.on('response', (msg: any) => {
-      if (msg.data.type === 'complete') {
-        console.log('\n\n✅ Debugging plan generated successfully!');
-        console.log('\n🔧 Follow the steps above to resolve the error.');
-        client.close();
-      }
+      console.log('\n\n✅ Debugging plan generated successfully!');
+      console.log('\n🔧 Follow the steps above to resolve the error.');
+      client.close();
     });
 
     client.on('error', (msg: any) => {

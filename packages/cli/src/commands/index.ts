@@ -42,17 +42,19 @@ export async function indexCommand(options: any) {
     });
 
     client.on('response', (msg: any) => {
-      if (msg.data.type === 'complete') {
-        console.log('\n\n✅ Codebase indexing completed successfully!');
+      console.log('\n\n✅ Codebase indexing completed successfully!');
+      if (msg.data?.message) {
         console.log(`📈 ${msg.data.message}`);
-        console.log('\n💡 Your codebase is now ready for planning and error analysis.');
-        client.close();
       }
+      console.log('\n💡 Your codebase is now ready for planning and error analysis.');
+      client.close();
+      process.exit(0);
     });
 
     client.on('error', (msg: any) => {
       console.error('\n❌ Error during indexing:', msg.data.message);
       client.close();
+      process.exit(1);
     });
 
     // Send the indexing request

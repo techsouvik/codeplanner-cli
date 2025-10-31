@@ -61,7 +61,11 @@ class CodePlannerGateway {
           // Handle incoming messages from clients
           message: async (ws, message) => {
             try {
-              const msg: WSMessage = JSON.parse(message as string);
+              let msg = JSON.parse(message as string);
+              // Support raw PlanRequest/analyze-error/index legacy messages from CLI:
+              if (!msg.type && (msg.command || msg.query || msg.errorInput)) {
+                msg = { type: 'request', jobId: crypto.randomUUID(), data: msg };
+              }
               const jobId = crypto.randomUUID();
               
               console.log(`📨 Received ${msg.type} message from ${ws.data.connectionId}`);

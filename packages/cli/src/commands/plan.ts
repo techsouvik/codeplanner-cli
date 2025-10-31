@@ -37,15 +37,15 @@ export async function planCommand(query: string, options: any) {
     // Set up event handlers for streaming responses
     client.on('stream', (msg: any) => {
       // Stream the plan content as it's generated
-      process.stdout.write(msg.data.chunk);
+      process.stdout.write(
+        typeof msg.data.chunk === 'string' ? msg.data.chunk : JSON.stringify(msg.data.chunk)
+      );
     });
 
     client.on('response', (msg: any) => {
-      if (msg.data.type === 'complete') {
-        console.log('\n\n✅ Implementation plan generated successfully!');
-        console.log('\n💡 You can now use this plan to implement your feature.');
-        client.close();
-      }
+      console.log('\n\n✅ Implementation plan generated successfully!');
+      console.log('\n💡 You can now use this plan to implement your feature.');
+      client.close();
     });
 
     client.on('error', (msg: any) => {

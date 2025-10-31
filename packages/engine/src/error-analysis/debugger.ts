@@ -9,6 +9,7 @@ import OpenAI from 'openai';
 import { ASTParser } from '../parser/ast-parser';
 import type { ParsedError, CodeChunk, DebuggingPlan, DebuggingStep } from '@codeplanner/shared';
 import type { PlanGeneratorConfig } from '../types';
+import { getRateLimiter } from '../utils/rate-limiter';
 
 /**
  * AI-powered debugger that analyzes errors and generates debugging plans
@@ -57,22 +58,26 @@ export class Debugger {
       console.log(`🐛 Analyzing ${error.type} error: ${error.message}`);
       console.log(`📊 Using ${relevantCode.length} relevant code chunks as context`);
       
-      // Create the streaming completion
-      const stream = await this.openai.chat.completions.create({
-        model: this.config.model!,
-        messages: [
-          {
-            role: 'system',
-            content: this.getSystemPrompt()
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        stream: true,
-        temperature: this.config.temperature,
-        max_tokens: 4000
+      // Create the streaming completion with retry/backoff
+      const stream = await this.withRateLimitRetry(async () => {
+        const limiter = getRateLimiter({ name: 'debugger' });
+        return await limiter.schedule(async () => {
+          return await this.openai.chat.completions.create({
+            model: this.config.model!,
+            messages: [
+              {
+                role: 'system',
+                content: this.getSystemPrompt()
+              },
+              {
+                role: 'user',
+                content: prompt
+              }
+            ],
+            stream: true,
+            ...(this.getTokenParam(4000) as any)
+          });
+        }, 'chat.completions(stream)');
       });
 
       // Return the streaming response
@@ -242,20 +247,24 @@ Focus on practical solutions that can be implemented immediately while also help
    */
   async generateQuickFix(error: ParsedError): Promise<string> {
     try {
-      const response = await this.openai.chat.completions.create({
-        model: this.config.model!,
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a debugging expert. Provide concise, actionable fix suggestions for programming errors.'
-          },
-          {
-            role: 'user',
-            content: `Provide a quick fix for this ${error.type} error: ${error.message}`
-          }
-        ],
-        temperature: 0.1,
-        max_tokens: 200
+      const response = await this.withRateLimitRetry(async () => {
+        const limiter = getRateLimiter({ name: 'debugger' });
+        return await limiter.schedule(async () => {
+          return await this.openai.chat.completions.create({
+            model: this.config.model!,
+            messages: [
+              {
+                role: 'system',
+                content: 'You are a debugging expert. Provide concise, actionable fix suggestions for programming errors.'
+              },
+              {
+                role: 'user',
+                content: `Provide a quick fix for this ${error.type} error: ${error.message}`
+              }
+            ],
+            ...(this.getTokenParam(200) as any)
+          });
+        }, 'chat.completions(quick-fix)');
       });
 
       return response.choices[0]?.message?.content || 'Quick fix generation failed';
@@ -278,20 +287,24 @@ Focus on practical solutions that can be implemented immediately while also help
     try {
       const errorSummary = errors.map(e => `${e.type}: ${e.message}`).join('\n');
       
-      const response = await this.openai.chat.completions.create({
-        model: this.config.model!,
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a code quality expert. Analyze error patterns and suggest improvements.'
-          },
-          {
-            role: 'user',
-            content: `Analyze these error patterns and suggest improvements:\n\n${errorSummary}`
-          }
-        ],
-        temperature: 0.2,
-        max_tokens: 300
+      const response = await this.withRateLimitRetry(async () => {
+        const limiter = getRateLimiter({ name: 'debugger' });
+        return await limiter.schedule(async () => {
+          return await this.openai.chat.completions.create({
+            model: this.config.model!,
+            messages: [
+              {
+                role: 'system',
+                content: 'You are a code quality expert. Analyze error patterns and suggest improvements.'
+              },
+              {
+                role: 'user',
+                content: `Analyze these error patterns and suggest improvements:\n\n${errorSummary}`
+              }
+            ],
+            ...(this.getTokenParam(300) as any)
+          });
+        }, 'chat.completions(patterns)');
       });
 
       const analysis = response.choices[0]?.message?.content || '';
@@ -332,5 +345,48 @@ Focus on practical solutions that can be implemented immediately while also help
       model: this.config.model!,
       temperature: this.config.temperature!
     };
+  }
+
+  /**
+   * Generic retry with exponential backoff and jitter for rate limiting (429)
+   */
+  private async withRateLimitRetry<T>(fn: () => Promise<T>, options?: {
+    retries?: number;
+    baseDelayMs?: number;
+    maxDelayMs?: number;
+  }): Promise<T> {
+    const retries = options?.retries ?? 5;
+    const baseDelayMs = options?.baseDelayMs ?? 500;
+    const maxDelayMs = options?.maxDelayMs ?? 8000;
+
+    let attempt = 0;
+    let lastErr: any;
+
+    while (attempt <= retries) {
+      try {
+        return await fn();
+      } catch (err: any) {
+        lastErr = err;
+        const status = err?.status || err?.code;
+        const isRateLimit = status === 429 || /429/.test(String(err?.message ?? ''));
+        if (!isRateLimit || attempt === retries) {
+          throw err;
+        }
+
+        const retryAfterHeader = err?.headers?.get?.('retry-after') || err?.response?.headers?.get?.('retry-after');
+        let delay = retryAfterHeader ? Number(retryAfterHeader) * 1000 : Math.min(maxDelayMs, baseDelayMs * Math.pow(2, attempt));
+        delay = Math.min(maxDelayMs, delay + Math.floor(Math.random() * 250));
+        const label = retryAfterHeader ? `Retry-After ${retryAfterHeader}s` : `${delay}ms`;
+        console.warn(`⏳ Rate limited (429). Retrying in ${label}... (attempt ${attempt + 1}/${retries})`);
+        await new Promise(res => setTimeout(res, delay));
+        attempt++;
+      }
+    }
+
+    throw lastErr;
+  }
+
+  private getTokenParam(value: number): any {
+    return { max_completion_tokens: value };
   }
 }

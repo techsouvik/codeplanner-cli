@@ -21,7 +21,8 @@ import type { JobMessage, JobResult, ProgressInfo } from './types';
  * Handles all job processing including indexing, planning, and error analysis
  */
 class CodePlannerWorker {
-  private redis: RedisClientType;
+  private redis: RedisClientType;      // normal publish & commands
+  private subscriber: RedisClientType; // for subscribe only
   private vectorStore: RedisVectorStore;
   private embeddingGen: EmbeddingGenerator;
   private planGen: PlanGenerator;
@@ -33,6 +34,9 @@ class CodePlannerWorker {
     // Initialize Redis client
     this.redis = createClient({ 
       url: process.env.REDIS_URL || 'redis://localhost:6379' 
+    });
+    this.subscriber = createClient({
+      url: process.env.REDIS_URL || 'redis://localhost:6379'
     });
     
     // Initialize vector store
@@ -104,6 +108,9 @@ class CodePlannerWorker {
     this.redis.on('error', (err) => {
       console.error('❌ Redis worker error:', err);
     });
+    this.subscriber.on('error', (err) => {
+      console.error('❌ Redis worker subscriber error:', err);
+    });
   }
 
   /**
@@ -111,16 +118,17 @@ class CodePlannerWorker {
    */
   async start(): Promise<void> {
     try {
-      // Connect to Redis
+      // Connect Redis and subscriber
       await this.redis.connect();
+      await this.subscriber.connect();
       await this.vectorStore.connect();
       
       this.isRunning = true;
       console.log('🚀 CodePlanner Worker started');
       console.log('📡 Listening for jobs on Redis channel: jobs:pending');
       
-      // Subscribe to job queue
-      await this.redis.subscribe('jobs:pending', async (message) => {
+      // Subscribe to job queue using subscriber
+      await this.subscriber.subscribe('jobs:pending', async (message) => {
         try {
           const job: JobMessage = JSON.parse(message);
           await this.processJob(job);
@@ -437,6 +445,7 @@ class CodePlannerWorker {
     try {
       await this.vectorStore.disconnect();
       await this.redis.quit();
+      await this.subscriber.quit(); // Also quit the subscriber
       console.log('✅ Worker shutdown complete');
     } catch (error) {
       console.error('❌ Error during worker shutdown:', error);
